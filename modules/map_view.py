@@ -166,6 +166,71 @@ def dispatch_map(plans: pd.DataFrame) -> folium.Map:
     return m
 
 
+def demand_prediction_map(predictions: pd.DataFrame) -> folium.Map:
+    """Map shortage-risk grid areas; high demand_gap points are emphasized."""
+    m = base_map()
+    if predictions.empty:
+        return m
+    df = predictions.copy()
+    if "demand_gap" not in df.columns:
+        df["demand_gap"] = pd.to_numeric(df["predicted_start_count"], errors="coerce").fillna(0) - pd.to_numeric(df["predicted_end_count"], errors="coerce").fillna(0)
+    for row in df.itertuples():
+        area_name, landmark_distance, area_type = nearest_area_name(row.center_lng, row.center_lat)
+        risk = getattr(row, "risk_level", "低")
+        gap = float(getattr(row, "demand_gap", 0) or 0)
+        color = "red" if risk == "高" else ("orange" if risk == "中" else "lightgray")
+        radius = 8 if risk == "高" else (6 if risk == "中" else 4)
+        fill_opacity = 0.86 if risk == "高" else (0.62 if risk == "中" else 0.28)
+        folium.CircleMarker(
+            location=[row.center_lat, row.center_lng],
+            radius=radius,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=fill_opacity,
+            weight=2 if risk == "高" else 1,
+            tooltip=f"{area_name}：{risk}缺车风险，缺口 {gap:.2f}",
+            popup=(
+                f"网格区域: {area_name}<br>类型: {area_type}<br>距参考地标: {landmark_distance} km<br>"
+                f"grid_id: {row.grid_id}<br>预测时间: {row.predict_time}<br>"
+                f"预测借车需求: {row.predicted_start_count}<br>预测还车供给: {row.predicted_end_count}<br>"
+                f"供需缺口: {gap:.2f}<br>风险等级: {risk}"
+            ),
+        ).add_to(m)
+    add_map_legend(m, "缺车风险等级", [("#ef4444", "高风险网格区域"), ("#f59e0b", "中风险网格区域"), ("#d1d5db", "低风险/平衡区域")])
+    return m
+
+
+def dispatch_route_map(plans: pd.DataFrame) -> folium.Map:
+    """Dispatch route map with high-priority tasks highlighted."""
+    m = base_map()
+    if plans.empty:
+        return m
+    for row in plans.itertuples():
+        high = str(row.priority) == "高"
+        line_color = "#dc2626" if high else "#2563eb"
+        line_weight = 5 if high else 3
+        folium.Marker(
+            [row.source_lat, row.source_lng],
+            tooltip=f"调出网格 {row.source_grid_id}",
+            icon=folium.Icon(color="red", icon="arrow-up"),
+        ).add_to(m)
+        folium.Marker(
+            [row.target_lat, row.target_lng],
+            tooltip=f"调入网格 {row.target_grid_id}",
+            icon=folium.Icon(color="green", icon="arrow-down"),
+        ).add_to(m)
+        folium.PolyLine(
+            locations=[[row.source_lat, row.source_lng], [row.target_lat, row.target_lng]],
+            color=line_color,
+            weight=line_weight,
+            opacity=0.82,
+            popup=f"建议调度 {row.dispatch_bikes} 辆，距离 {row.distance_km} km，优先级 {row.priority}",
+        ).add_to(m)
+    add_map_legend(m, "调度路线说明", [("#ef4444", "高优先级路线/调出区"), ("#2563eb", "普通路线"), ("#22c55e", "调入区域")])
+    return m
+
+
 def weather_map(weather_df: pd.DataFrame) -> folium.Map:
     m = base_map(zoom_start=11)
     if weather_df.empty:

@@ -120,6 +120,7 @@ def init_db(engine: Engine | None = None) -> None:
             predict_time TEXT,
             predicted_end_count REAL,
             predicted_start_count REAL,
+            demand_gap REAL,
             risk_level TEXT,
             model_name TEXT,
             center_lng REAL,
@@ -212,6 +213,9 @@ def init_db(engine: Engine | None = None) -> None:
         existing_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(weather_daily)")).fetchall()]
         if "weather_code" not in existing_cols:
             conn.execute(text("ALTER TABLE weather_daily ADD COLUMN weather_code INTEGER"))
+        prediction_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(prediction_results)")).fetchall()]
+        if "demand_gap" not in prediction_cols:
+            conn.execute(text("ALTER TABLE prediction_results ADD COLUMN demand_gap REAL"))
 
 
 def initialize_database() -> Path | None:
@@ -334,8 +338,23 @@ def replace_predictions(df: pd.DataFrame, engine: Engine | None = None) -> int:
         conn.execute(text("DELETE FROM prediction_results"))
     if df.empty:
         return 0
-    df.to_sql("prediction_results", engine, if_exists="append", index=False)
-    return len(df)
+    columns = [
+        "grid_id",
+        "predict_time",
+        "predicted_end_count",
+        "predicted_start_count",
+        "demand_gap",
+        "risk_level",
+        "model_name",
+        "center_lng",
+        "center_lat",
+        "created_at",
+    ]
+    write_df = df.copy()
+    if "demand_gap" not in write_df.columns:
+        write_df["demand_gap"] = pd.to_numeric(write_df.get("predicted_start_count"), errors="coerce").fillna(0) - pd.to_numeric(write_df.get("predicted_end_count"), errors="coerce").fillna(0)
+    write_df.reindex(columns=columns).to_sql("prediction_results", engine, if_exists="append", index=False)
+    return len(write_df)
 
 
 def replace_dispatch_plans(df: pd.DataFrame, engine: Engine | None = None) -> int:

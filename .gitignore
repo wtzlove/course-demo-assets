@@ -32,3 +32,6 @@ outputs/reports/*
 Thumbs.db
 .idea/
 .vscode/
+
+# Local paper/reference material
+paper/
