@@ -23,6 +23,8 @@ data/processed/*.csv
 
 # Generated outputs
 outputs/models/*.joblib
+outputs/models/*.pt
+outputs/models/*.pkl
 outputs/figures/*
 outputs/tables/*
 outputs/reports/*

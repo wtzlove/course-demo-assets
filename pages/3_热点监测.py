@@ -26,6 +26,17 @@ def prepare_heatmap_orders(df, point_type: str):
     return valid, valid_count, False
 
 
+def note_box(text: str) -> None:
+    st.markdown(
+        f"""
+        <div style="background:#ffffff;border:1px solid #dbe3ef;border-left:4px solid #0f7bff;
+                    border-radius:8px;padding:10px 12px;margin:8px 0;color:#475569;
+                    font-size:14px;line-height:1.55;">{text}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 st.set_page_config(page_title="热点监测", layout="wide")
 require_login([ROLE_ADMIN, ROLE_OPERATOR, ROLE_VIEWER])
 engine = get_engine()
@@ -160,7 +171,7 @@ elif view == "小时趋势":
     if hourly.empty:
         st.info("暂无小时统计数据。")
     else:
-        st.info(trend_summary(hourly, forecast))
+        note_box(trend_summary(hourly, forecast))
         st.plotly_chart(make_hourly_trend_chart(hourly, forecast), use_container_width=True)
         detail = hourly[["stat_time", "开始订单数量", "结束订单数量", "总订单数量", "3小时移动均值", "时段类型"]].tail(24)
         st.dataframe(detail, use_container_width=True, hide_index=True)

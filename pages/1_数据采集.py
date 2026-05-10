@@ -75,6 +75,7 @@ st.subheader("气象与节假日数据")
 env1, env2, env3 = st.columns([1, 1, 1])
 env_start = env1.date_input("环境数据开始日期", value=datetime.now().date() - timedelta(days=7), key="env_start")
 env_end = env2.date_input("环境数据结束日期", value=datetime.now().date() + timedelta(days=7), key="env_end")
+env3.markdown("<div style='height: 1.85rem;'></div>", unsafe_allow_html=True)
 if env3.button("采集气象与节假日数据", use_container_width=True):
     with st.spinner("正在采集气象数据并生成节假日日历..."):
         result = collect_environment_data(env_start.strftime("%Y-%m-%d"), env_end.strftime("%Y-%m-%d"), engine=engine)
