@@ -1,0 +1,6 @@
+[llm]
+# 复制本文件为 llm_config.toml 后再填写真实密钥。
+# Coding Plan 通常使用 sk-sp-xxxxx；普通百炼通常使用 sk-xxxxx。
+api_key = "请填写你的API Key"
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+model = "qwen-plus"

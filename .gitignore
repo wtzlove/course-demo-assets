@@ -1,0 +1,34 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+llm_config.toml
+llm_config.*.toml
+!llm_config.example.toml
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local Streamlit runtime files
+.streamlit/*
+!.streamlit/config.toml
+
+# Local databases and generated data
+data/database/*.db
+data/database/*.db-*
+data/raw/*.json
+data/processed/*.csv
+
+# Generated outputs
+outputs/models/*.joblib
+outputs/figures/*
+outputs/tables/*
+outputs/reports/*
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
