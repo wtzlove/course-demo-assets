@@ -114,18 +114,18 @@ try:
         "这里将经纬度网格区域视为虚拟站点，用于识别下一小时可能出现的缺车风险和停放压力。"
     )
 
-    c1, c2, c3 = st.columns([1, 1, 1])
+    c1, c2 = st.columns(2)
     predict_date = c1.date_input("预测日期", value=(datetime.now() + timedelta(hours=1)).date())
     predict_hour = c2.time_input("预测小时", value=time((datetime.now() + timedelta(hours=1)).hour, 0, 0))
     predict_dt = datetime.combine(predict_date, predict_hour)
     env_result = ensure_environment_for_date(predict_date.strftime("%Y-%m-%d"), engine=engine)
     env = environment_for_date(predict_date.strftime("%Y-%m-%d"), engine=engine)
-    c3.metric("日期类型", "节假日" if env["is_holiday"] else ("周末" if env["is_weekend"] else "工作日"))
 
-    e1, e2, e3 = st.columns(3)
-    e1.metric("预测日均温", f"{env['temperature_mean']} °C")
-    e2.metric("预测日降水", f"{env['precipitation_sum']} mm")
-    e3.metric("预测日最大风速", f"{env['wind_speed_max']} km/h")
+    e1, e2, e3, e4 = st.columns(4)
+    e1.metric("日期类型", "节假日" if env["is_holiday"] else ("周末" if env["is_weekend"] else "工作日"))
+    e2.metric("预测日均温", f"{env['temperature_mean']} °C")
+    e3.metric("预测日降水", f"{env['precipitation_sum']} mm")
+    e4.metric("预测日最大风速", f"{env['wind_speed_max']} km/h")
     if env_result.get("weather_error"):
         st.warning("天气接口暂未获取成功，系统已使用默认或已有天气特征继续预测。")
 

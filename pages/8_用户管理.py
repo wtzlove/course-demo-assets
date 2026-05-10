@@ -38,6 +38,7 @@ else:
     c1, c2, c3 = st.columns([1, 1, 1])
     selected_id = c1.selectbox("用户 ID", users["id"].tolist())
     status = c2.selectbox("状态", ["启用", "停用"])
+    c3.markdown("<div style='height: 1.85rem;'></div>", unsafe_allow_html=True)
     if c3.button("更新状态", use_container_width=True):
         update_user_status(int(selected_id), status, engine=engine)
         st.success("用户状态已更新。")

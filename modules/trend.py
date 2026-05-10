@@ -6,9 +6,9 @@ import plotly.graph_objects as go
 
 
 PEAK_FACTORS = {
-    "早高峰": {"hours": {7, 8, 9}, "factor": 1.12},
-    "午间出行": {"hours": {11, 12, 13}, "factor": 1.06},
-    "放学/下班": {"hours": {16, 17, 18, 19}, "factor": 1.18},
+    "早高峰": {"hours": {7, 8, 9}, "factor": 1.06},
+    "午间出行": {"hours": {11, 12, 13}, "factor": 1.03},
+    "放学/下班": {"hours": {16, 17, 18, 19}, "factor": 1.08},
 }
 
 
@@ -36,7 +36,8 @@ def build_hourly_timeseries(stats: pd.DataFrame) -> pd.DataFrame:
         .sum()
         .sort_values("stat_time")
     )
-    grouped["总订单数量"] = grouped["start_count"] + grouped["end_count"]
+    # 小时订单量以开始订单为主，避免将同一订单的借车和还车事件重复相加。
+    grouped["总订单数量"] = grouped["start_count"]
     grouped["开始订单数量"] = grouped["start_count"]
     grouped["结束订单数量"] = grouped["end_count"]
     grouped["3小时移动均值"] = grouped["总订单数量"].rolling(3, min_periods=1).mean().round(2)
@@ -47,21 +48,49 @@ def build_hourly_timeseries(stats: pd.DataFrame) -> pd.DataFrame:
 def forecast_next_hours(hourly: pd.DataFrame, steps: int = 3) -> pd.DataFrame:
     if hourly.empty:
         return pd.DataFrame()
-    recent = hourly.tail(min(len(hourly), 12)).copy()
+
+    df = hourly.copy()
+    df["stat_time"] = pd.to_datetime(df["stat_time"])
+    df["hour"] = df["stat_time"].dt.hour
+    df["is_weekend"] = df["stat_time"].dt.weekday >= 5
+    df["总订单数量"] = pd.to_numeric(df["总订单数量"], errors="coerce").fillna(0)
+
+    recent = df.tail(min(len(df), 12)).copy()
     y = recent["总订单数量"].astype(float).values
     x = np.arange(len(y))
-    if len(y) >= 2:
-        slope, intercept = np.polyfit(x, y, 1)
-    else:
-        slope, intercept = 0, y[-1]
-    last_time = pd.to_datetime(hourly["stat_time"].iloc[-1])
+    slope = float(np.polyfit(x, y, 1)[0]) if len(y) >= 2 else 0.0
+    last_time = pd.to_datetime(df["stat_time"].iloc[-1])
     rows = []
-    base_recent = float(hourly["总订单数量"].tail(3).mean())
+
+    recent_mean = float(df["总订单数量"].tail(min(6, len(df))).mean())
+    last_value = float(df["总订单数量"].iloc[-1])
+    global_p90 = float(df["总订单数量"].quantile(0.90)) if len(df) > 1 else max(last_value, recent_mean)
+
     for step in range(1, steps + 1):
         next_time = last_time + timedelta(hours=step)
-        linear_value = intercept + slope * (len(y) + step - 1)
-        value = max(0, 0.55 * linear_value + 0.45 * base_recent)
-        value *= peak_factor(next_time.hour)
+        same_hour = df[df["hour"] == next_time.hour]["总订单数量"]
+        same_type = df[
+            (df["hour"] == next_time.hour)
+            & (df["is_weekend"] == (next_time.weekday() >= 5))
+        ]["总订单数量"]
+        history = same_type if len(same_type) >= 2 else same_hour
+
+        if not history.empty:
+            hour_baseline = float(history.median())
+            hour_p90 = float(history.quantile(0.90))
+            factor = 1.0
+        else:
+            hour_baseline = recent_mean
+            hour_p90 = global_p90
+            factor = peak_factor(next_time.hour)
+
+        trend_delta = float(np.clip(slope * step, -0.25 * max(recent_mean, 1), 0.25 * max(recent_mean, 1)))
+        trend_value = last_value + trend_delta
+        value = 0.60 * hour_baseline + 0.25 * recent_mean + 0.15 * max(0, trend_value)
+        value *= factor
+
+        cap = max(hour_baseline * 1.35, hour_p90 * 1.15, recent_mean * 1.20, 1.0)
+        value = min(max(0, value), cap)
         rows.append(
             {
                 "stat_time": next_time,
@@ -140,7 +169,7 @@ def make_hourly_trend_chart(hourly: pd.DataFrame, forecast: pd.DataFrame):
         height=560,
         annotations=[
             dict(
-                text="趋势预测已加入早高峰、午间、放学/下班时段修正",
+                text="趋势预测基于同小时历史订单，并对早高峰、午间、放学/下班时段做温和修正",
                 xref="paper",
                 yref="paper",
                 x=0,
